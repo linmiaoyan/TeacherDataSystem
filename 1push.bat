@@ -9,6 +9,19 @@ echo.
 
 cd /d "%~dp0"
 
+REM 配置Git安全目录（解决所有权问题）
+echo [配置] 设置Git安全目录...
+set CURRENT_DIR=%~dp0
+REM 移除末尾的反斜杠
+set CURRENT_DIR=%CURRENT_DIR:~0,-1%
+git config --global --add safe.directory "%CURRENT_DIR%" >nul 2>&1
+REM 也添加带反斜杠的版本
+git config --global --add safe.directory "%CURRENT_DIR%\" >nul 2>&1
+REM 添加当前目录的父目录（如果需要）
+for %%P in ("%CURRENT_DIR%") do git config --global --add safe.directory "%%~dpP" >nul 2>&1
+echo [成功] Git安全目录已配置
+echo.
+
 REM 检查Git是否安装
 git --version >nul 2>&1
 if %errorlevel% neq 0 (

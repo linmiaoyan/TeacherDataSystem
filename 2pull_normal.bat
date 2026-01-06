@@ -11,6 +11,19 @@ echo.
 
 cd /d "%~dp0"
 
+REM 配置Git安全目录（解决所有权问题）
+echo [配置] 设置Git安全目录...
+set CURRENT_DIR=%~dp0
+REM 移除末尾的反斜杠
+set CURRENT_DIR=%CURRENT_DIR:~0,-1%
+git config --global --add safe.directory "%CURRENT_DIR%" >nul 2>&1
+REM 也添加带反斜杠的版本
+git config --global --add safe.directory "%CURRENT_DIR%\" >nul 2>&1
+REM 添加当前目录的父目录（如果需要）
+for %%P in ("%CURRENT_DIR%") do git config --global --add safe.directory "%%~dpP" >nul 2>&1
+echo [成功] Git安全目录已配置
+echo.
+
 REM 检查是否在Git仓库中
 if not exist ".git" (
     echo [提示] 当前目录不是Git仓库，正在初始化...
@@ -60,15 +73,49 @@ if %errorlevel% equ 0 (
     )
     echo.
     
+    echo [步骤] 检查并处理文件冲突...
+    REM 先尝试fetch查看远程文件
+    git fetch origin main >nul 2>&1
+    
+    REM 检查未跟踪的文件是否与远程冲突
+    for /f "tokens=*" %%f in ('git ls-tree -r --name-only origin/main 2^>nul') do (
+        if exist "%%f" (
+            git status --porcelain "%%f" | findstr "^??" >nul 2>&1
+            if !errorlevel! equ 0 (
+                echo [警告] 本地未跟踪文件 %%f 与远程文件冲突
+                echo [处理] 备份为 %%f.local 并删除原文件...
+                if not exist "%%f.local" (
+                    copy "%%f" "%%f.local" >nul 2>&1
+                    echo [成功] 已备份到 %%f.local
+                )
+                del "%%f" >nul 2>&1
+            )
+        )
+    )
+    echo.
+    
     echo [步骤] 正在拉取最新代码...
     
     REM 先尝试普通拉取
     git pull origin main
     
     if %errorlevel% neq 0 (
-        echo [提示] 普通拉取失败，尝试合并不相关的历史...
-        REM 如果普通拉取失败，尝试允许不相关的历史合并
-        git pull origin main --allow-unrelated-histories
+        REM 检查是否是文件覆盖错误
+        git pull origin main 2>&1 | findstr /C:"would be overwritten" >nul 2>&1
+        if %errorlevel% equ 0 (
+            echo [提示] 检测到文件覆盖冲突，使用强制策略...
+            REM 使用ours策略，优先使用远程版本
+            git pull origin main -X theirs --allow-unrelated-histories
+            if %errorlevel% equ 0 (
+                echo [成功] 已使用远程版本覆盖本地文件
+            )
+        )
+        
+        if %errorlevel% neq 0 (
+            echo [提示] 普通拉取失败，尝试合并不相关的历史...
+            REM 如果普通拉取失败，尝试允许不相关的历史合并
+            git pull origin main --allow-unrelated-histories
+        )
         
         if %errorlevel% equ 0 (
             echo.
@@ -121,15 +168,49 @@ if %errorlevel% equ 0 (
     )
     echo.
     
+    echo [步骤] 检查并处理文件冲突...
+    REM 先尝试fetch查看远程文件
+    git fetch origin main >nul 2>&1
+    
+    REM 检查未跟踪的文件是否与远程冲突
+    for /f "tokens=*" %%f in ('git ls-tree -r --name-only origin/main 2^>nul') do (
+        if exist "%%f" (
+            git status --porcelain "%%f" | findstr "^??" >nul 2>&1
+            if !errorlevel! equ 0 (
+                echo [警告] 本地未跟踪文件 %%f 与远程文件冲突
+                echo [处理] 备份为 %%f.local 并删除原文件...
+                if not exist "%%f.local" (
+                    copy "%%f" "%%f.local" >nul 2>&1
+                    echo [成功] 已备份到 %%f.local
+                )
+                del "%%f" >nul 2>&1
+            )
+        )
+    )
+    echo.
+    
     echo [步骤] 正在拉取最新代码...
     
     REM 先尝试普通拉取
     git pull origin main
     
     if %errorlevel% neq 0 (
-        echo [提示] 普通拉取失败，尝试合并不相关的历史...
-        REM 如果普通拉取失败，尝试允许不相关的历史合并
-        git pull origin main --allow-unrelated-histories
+        REM 检查是否是文件覆盖错误
+        git pull origin main 2>&1 | findstr /C:"would be overwritten" >nul 2>&1
+        if %errorlevel% equ 0 (
+            echo [提示] 检测到文件覆盖冲突，使用强制策略...
+            REM 使用ours策略，优先使用远程版本
+            git pull origin main -X theirs --allow-unrelated-histories
+            if %errorlevel% equ 0 (
+                echo [成功] 已使用远程版本覆盖本地文件
+            )
+        )
+        
+        if %errorlevel% neq 0 (
+            echo [提示] 普通拉取失败，尝试合并不相关的历史...
+            REM 如果普通拉取失败，尝试允许不相关的历史合并
+            git pull origin main --allow-unrelated-histories
+        )
         
         if %errorlevel% equ 0 (
             echo.
