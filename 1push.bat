@@ -65,9 +65,17 @@ echo.
 REM 检查是否有需要提交的更改（包括已暂存的）
 git diff --cached --quiet
 if %errorlevel% equ 0 (
-    echo [提示] 当前没有新的更改需要提交，将直接尝试推送已有提交...
-    echo.
-    goto PUSH_STEP
+    REM 额外检查：仓库是否已有至少一个提交
+    git rev-parse --verify HEAD >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [提示] 当前仓库还没有任何提交，首次使用必须先提交一次。
+        echo [提示] 请先修改文件或确认已有文件需要提交，然后输入提交描述。
+        echo.
+    ) else (
+        echo [提示] 当前没有新的更改需要提交，将直接尝试推送已有提交...
+        echo.
+        goto PUSH_STEP
+    )
 )
 
 set /p commit_msg="请输入提交描述: "
@@ -99,7 +107,14 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-git push -u origin main
+for /f %%i in ('git rev-parse --abbrev-ref HEAD') do set "BRANCH=%%i"
+if "!BRANCH!"=="" (
+    echo [错误] 无法获取当前分支
+    pause
+    exit /b 1
+)
+echo [提示] 当前分支: !BRANCH!
+git push -u origin !BRANCH!
 if %errorlevel% equ 0 (
     echo.
     echo ============================================
