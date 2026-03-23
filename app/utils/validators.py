@@ -2,7 +2,10 @@
 数据验证工具
 """
 import re
+from datetime import datetime
 from typing import Dict, Any, Optional
+
+from app.utils.age_birth import normalize_extra_age_birth
 
 
 def validate_id_number(id_number: str) -> bool:
@@ -81,7 +84,11 @@ def clean_teacher_data(data: Dict[str, Any]) -> Dict[str, Any]:
                 cleaned[key] = value.strip()
             else:
                 cleaned[key] = value
-    
+
+    ex = cleaned.get("extra_data")
+    if isinstance(ex, dict):
+        normalize_extra_age_birth(ex, datetime.now())
+
     return cleaned
 
 

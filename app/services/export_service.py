@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models import Teacher, Template
 from app.services.template_processor import process_template
+from app.utils.age_birth import prepare_extra_for_fill
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -59,6 +60,8 @@ def batch_export(template_id: int, teacher_ids: List[int], db: Session, task_nam
                 except (ValueError, TypeError):
                     pass
             
+            refd = datetime.now().date()
+            legacy = getattr(teacher, "updated_at", None) or getattr(teacher, "created_at", None)
             teacher_data = {
                 'name': teacher.name,
                 'sex': teacher.sex,
@@ -68,7 +71,9 @@ def batch_export(template_id: int, teacher_ids: List[int], db: Session, task_nam
                 'department': teacher.department,
                 'position': teacher.position,
                 'title': teacher.title,
-                'extra_data': teacher.extra_data or {}
+                'extra_data': prepare_extra_for_fill(
+                    teacher.extra_data or {}, refd, legacy_as_of=legacy
+                ),
             }
             
             # 检查是否有签名字段（base64图片）

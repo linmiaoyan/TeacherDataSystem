@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import Task, Template
 from app.services.export_service import batch_export
 from app.deps import require_admin, require_teacher_id
+from app.utils.age_birth import prepare_extra_for_fill
 
 router = APIRouter(prefix="/api/tasks", tags=["填报任务"])
 
@@ -486,6 +487,8 @@ def download_teacher_file(
         except (ValueError, TypeError):
             pass
     
+    refd = datetime.now().date()
+    legacy = getattr(teacher, "updated_at", None) or getattr(teacher, "created_at", None)
     teacher_data = {
         'name': teacher.name,
         'sex': teacher.sex,
@@ -495,7 +498,9 @@ def download_teacher_file(
         'department': teacher.department,
         'position': teacher.position,
         'title': teacher.title,
-        'extra_data': teacher.extra_data or {}
+        'extra_data': prepare_extra_for_fill(
+            teacher.extra_data or {}, refd, legacy_as_of=legacy
+        ),
     }
     
     # 生成临时文件

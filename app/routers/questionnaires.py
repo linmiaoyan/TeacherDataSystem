@@ -7,9 +7,13 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime
 import secrets
+
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.database import get_db
 from app.models import Questionnaire, QuestionnaireResponse, Teacher
 from app.deps import require_admin, assert_admin_or_teacher
+from app.utils.age_birth import normalize_extra_age_birth
 
 router = APIRouter(prefix="/api/questionnaires", tags=["问卷系统"])
 
@@ -189,6 +193,8 @@ def submit_response(
         if not teacher.extra_data:
             teacher.extra_data = {}
         teacher.extra_data.update(existing.answers)
+        normalize_extra_age_birth(teacher.extra_data, existing.submitted_at or datetime.now())
+        flag_modified(teacher, "extra_data")
         teacher.updated_at = datetime.now()
         db.commit()
 
@@ -253,10 +259,19 @@ def update_response(response_id: int, update_data: ResponseUpdate, db: Session =
     
     response.answers = update_data.answers
     response.submitted_at = datetime.now()
+
+    teacher = db.query(Teacher).filter(Teacher.id == response.teacher_id).first()
+    if teacher:
+        if not teacher.extra_data:
+            teacher.extra_data = {}
+        teacher.extra_data.update(response.answers)
+        normalize_extra_age_birth(teacher.extra_data, response.submitted_at or datetime.now())
+        flag_modified(teacher, "extra_data")
+        teacher.updated_at = datetime.now()
+
     db.commit()
     db.refresh(response)
-    
-    teacher = db.query(Teacher).filter(Teacher.id == response.teacher_id).first()
+
     return QuestionnaireResponseResponse(
         id=response.id,
         questionnaire_id=response.questionnaire_id,
@@ -339,6 +354,8 @@ def review_response(
             if not teacher.extra_data:
                 teacher.extra_data = {}
             teacher.extra_data.update(response.answers)
+            normalize_extra_age_birth(teacher.extra_data, datetime.now())
+            flag_modified(teacher, "extra_data")
             teacher.updated_at = datetime.now()
     
     db.commit()
